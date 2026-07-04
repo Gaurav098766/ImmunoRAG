@@ -1,0 +1,6 @@
+httpx
+lxml
+fastembed
+qdrant-client
+python-dotenv
+groq

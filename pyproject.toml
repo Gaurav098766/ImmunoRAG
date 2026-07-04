@@ -1,0 +1,14 @@
+[project]
+name = "immunorag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastembed>=0.8.0",
+    "groq>=1.4.0",
+    "httpx>=0.28.1",
+    "lxml>=6.1.1",
+    "python-dotenv>=1.2.2",
+    "qdrant-client>=1.18.0",
+]
