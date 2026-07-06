@@ -1,14 +1,14 @@
 # ingest/embed_store.py
 """
-L1 — Embed chunks with BAAI/bge-small-en-v1.5 and upsert into Qdrant.
+L1/L2 — Embed chunks with bge-small-en-v1.5 (dense) and Qdrant/bm25 (sparse),
+upsert into Qdrant using named vectors for hybrid search.
 
 Reads every data/processed/{pmcid}_chunks.json (output of chunk.py),
-embeds each chunk's text, and stores dense vectors + payload
-(pmcid, section, chunk_index, text) in a fresh Qdrant collection.
+embeds each chunk's text with BOTH a dense and sparse model, and stores
+both vectors + payload (pmcid, section, chunk_index, text) in a fresh
+Qdrant collection.
 
-Recreates the collection from scratch on every run — no incremental
-upsert tracking needed at L1 scale (6K chunks embeds in a few minutes
-on CPU).
+Recreates the collection from scratch on every run.
 
 Requires Qdrant running: docker compose up -d qdrant
 
@@ -19,11 +19,17 @@ Run:
 import json
 from pathlib import Path
 
-from fastembed import TextEmbedding
+from fastembed import TextEmbedding, SparseTextEmbedding
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    PointStruct,
+    VectorParams,
+    SparseVectorParams,
+    SparseVector,
+)
 
-from config import PROCESSED_DATA_DIR, QDRANT_URL, COLLECTION, DENSE_MODEL
+from config import PROCESSED_DATA_DIR, QDRANT_URL, COLLECTION, DENSE_MODEL, SPARSE_MODEL
 
 BATCH_SIZE = 64
 VECTOR_SIZE = 384  # bge-small-en-v1.5 output dimension
@@ -40,9 +46,9 @@ def load_all_chunks() -> list[dict]:
 
 def ensure_collection(client: QdrantClient):
     """
-    Delete the collection if it exists, then create it fresh.
-    Recreating on every run keeps L1 simple — no need to reconcile
-    stale points against changed chunking logic.
+    Delete the collection if it exists, then create it fresh with BOTH
+    a dense vector config ("dense") and a sparse vector config ("sparse").
+    Named vectors let one point carry multiple vector types simultaneously.
     """
     if client.collection_exists(COLLECTION):
         client.delete_collection(COLLECTION)
@@ -50,9 +56,14 @@ def ensure_collection(client: QdrantClient):
 
     client.create_collection(
         collection_name=COLLECTION,
-        vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+        vectors_config={
+            "dense": VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+        },
+        sparse_vectors_config={
+            "sparse": SparseVectorParams(),
+        },
     )
-    print(f"Created collection '{COLLECTION}' (dim={VECTOR_SIZE}, distance=COSINE).")
+    print(f"Created collection '{COLLECTION}' with dense (dim={VECTOR_SIZE}) + sparse vectors.")
 
 
 def batched(items: list, batch_size: int):
@@ -66,8 +77,11 @@ def main():
     chunks = load_all_chunks()
     print(f"Loaded {len(chunks)} chunks total.")
 
-    print(f"Loading embedding model '{DENSE_MODEL}' (first run downloads ONNX weights)...")
-    embedder = TextEmbedding(model_name=DENSE_MODEL)
+    print(f"Loading dense model '{DENSE_MODEL}'...")
+    dense_embedder = TextEmbedding(model_name=DENSE_MODEL)
+
+    print(f"Loading sparse model '{SPARSE_MODEL}'...")
+    sparse_embedder = SparseTextEmbedding(model_name=SPARSE_MODEL)
 
     client = QdrantClient(url=QDRANT_URL)
     ensure_collection(client)
@@ -77,14 +91,22 @@ def main():
 
     for batch in batched(chunks, BATCH_SIZE):
         texts = [c["text"] for c in batch]
-        vectors = list(embedder.embed(texts))  # fastembed returns a generator; materialize per batch
+
+        dense_vectors = list(dense_embedder.embed(texts))
+        sparse_vectors = list(sparse_embedder.embed(texts))
 
         points = []
-        for chunk, vector in zip(batch, vectors):
+        for chunk, dense_vec, sparse_vec in zip(batch, dense_vectors, sparse_vectors):
             points.append(
                 PointStruct(
                     id=point_id,
-                    vector=vector.tolist(),
+                    vector={
+                        "dense": dense_vec.tolist(),
+                        "sparse": SparseVector(
+                            indices=sparse_vec.indices.tolist(),
+                            values=sparse_vec.values.tolist(),
+                        ),
+                    },
                     payload={
                         "pmcid": chunk["pmcid"],
                         "section": chunk["section"],
@@ -99,7 +121,7 @@ def main():
         embedded_count += len(points)
         print(f"  Embedded and upserted {embedded_count}/{len(chunks)} chunks...")
 
-    print(f"\nDone. {embedded_count} chunks embedded and stored in Qdrant collection '{COLLECTION}'.")
+    print(f"\nDone. {embedded_count} chunks embedded (dense+sparse) and stored in '{COLLECTION}'.")
 
 
 if __name__ == "__main__":
