@@ -15,3 +15,4 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 qdrant_data/
+pg_data/
