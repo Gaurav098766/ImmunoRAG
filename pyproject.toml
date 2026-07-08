@@ -9,6 +9,7 @@ dependencies = [
     "groq>=1.4.0",
     "httpx>=0.28.1",
     "lxml>=6.1.1",
+    "psycopg[binary]>=3.3.4",
     "python-dotenv>=1.2.2",
     "qdrant-client>=1.18.0",
 ]
