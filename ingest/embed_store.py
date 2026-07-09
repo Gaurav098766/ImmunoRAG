@@ -29,10 +29,31 @@ from qdrant_client.models import (
     SparseVector,
 )
 
-from config import PROCESSED_DATA_DIR, QDRANT_URL, COLLECTION, DENSE_MODEL, SPARSE_MODEL
+from config import PROCESSED_DATA_DIR, RAW_DATA_DIR, QDRANT_URL, COLLECTION, DENSE_MODEL, SPARSE_MODEL
 
 BATCH_SIZE = 64
 VECTOR_SIZE = 384  # bge-small-en-v1.5 output dimension
+
+
+def load_paper_metadata_lookup() -> dict:
+    """
+    Build a {pmcid: {pub_year, journal}} lookup from papers_metadata.json,
+    so each chunk's payload can carry these filterable fields without
+    needing to query Postgres from this script.
+    """
+    metadata_path = RAW_DATA_DIR / "papers_metadata.json"
+    papers = json.loads(metadata_path.read_text())
+
+    lookup = {}
+    for p in papers:
+        pub_year = p.get("pub_year")
+        if not pub_year:  # same 0 -> None normalization as load_metadata.py
+            pub_year = None
+        lookup[p["pmcid"]] = {
+            "pub_year": pub_year,
+            "journal": p.get("journal"),
+        }
+    return lookup
 
 
 def load_all_chunks() -> list[dict]:
@@ -73,6 +94,9 @@ def batched(items: list, batch_size: int):
 
 
 def main():
+    print("Loading paper metadata lookup...")
+    metadata_lookup = load_paper_metadata_lookup()
+
     print("Loading chunks from disk...")
     chunks = load_all_chunks()
     print(f"Loaded {len(chunks)} chunks total.")
@@ -97,6 +121,8 @@ def main():
 
         points = []
         for chunk, dense_vec, sparse_vec in zip(batch, dense_vectors, sparse_vectors):
+            paper_meta = metadata_lookup.get(chunk["pmcid"], {})
+
             points.append(
                 PointStruct(
                     id=point_id,
@@ -112,6 +138,8 @@ def main():
                         "section": chunk["section"],
                         "chunk_index": chunk["chunk_index"],
                         "text": chunk["text"],
+                        "pub_year": paper_meta.get("pub_year"),
+                        "journal": paper_meta.get("journal"),
                     },
                 )
             )
