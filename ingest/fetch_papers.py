@@ -145,6 +145,14 @@ def main():
 
 def _extract_metadata(hit: dict) -> dict:
     """Pull just the fields we'll need later (L3 loads these into Postgres)."""
+    pub_year_raw = (
+        hit.get("pubYear")
+        or hit.get("journalInfo", {}).get("yearOfPublication")
+    )
+    try:
+        pub_year = int(pub_year_raw) if pub_year_raw else None
+    except (TypeError, ValueError):
+        pub_year = None
     return {
         # Unique identifiers
         "id": hit.get("id"),
@@ -160,10 +168,7 @@ def _extract_metadata(hit: dict) -> dict:
                   .get("journal", {})
                   .get("title")
         ),
-        "pub_year": (
-            hit.get("pubYear")
-            or hit.get("journalInfo", {}).get("yearOfPublication")
-        ),
+        "pub_year": pub_year,
         "publication_date": (
             hit.get("firstPublicationDate")
             or hit.get("electronicPublicationDate")

@@ -47,14 +47,19 @@ def load_paper_metadata_lookup() -> dict:
     lookup = {}
     for p in papers:
         pub_year = p.get("pub_year")
-        if not pub_year:  # same 0 -> None normalization as load_metadata.py
+        if not pub_year:  # catches 0, None, "", "0" — all mean "unknown"
             pub_year = None
+        else:
+            try:
+                pub_year = int(pub_year)  # NEW: force numeric, whatever the source type was
+            except (TypeError, ValueError):
+                pub_year = None  # if it's genuinely unparseable, treat as unknown
+
         lookup[p["pmcid"]] = {
             "pub_year": pub_year,
             "journal": p.get("journal"),
         }
     return lookup
-
 
 def load_all_chunks() -> list[dict]:
     """Load every {pmcid}_chunks.json file into one flat list of chunk dicts."""
