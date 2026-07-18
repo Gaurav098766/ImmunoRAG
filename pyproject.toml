@@ -12,4 +12,5 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "python-dotenv>=1.2.2",
     "qdrant-client>=1.18.0",
+    "redis>=8.0.1",
 ]
