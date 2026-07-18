@@ -35,3 +35,9 @@ POSTGRES_READONLY_DSN = (
     f"postgresql://{POSTGRES_READONLY_USER}:{POSTGRES_READONLY_PASSWORD}"
     f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
+
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+OPENFDA_BASE_URL = "https://api.fda.gov"
+CACHE_TTL_SECONDS = 3600  # 1 hour — openFDA data doesn't change minute-to-minute
