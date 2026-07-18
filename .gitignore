@@ -16,3 +16,4 @@ data/processed/*
 !data/processed/.gitkeep
 qdrant_data/
 pg_data/
+redis_data/
