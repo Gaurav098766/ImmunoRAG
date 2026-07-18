@@ -45,3 +45,28 @@ CREATE TABLE IF NOT EXISTS trials (
 
 CREATE INDEX IF NOT EXISTS idx_trials_status ON trials (status);
 CREATE INDEX IF NOT EXISTS idx_trials_phase ON trials (phase);
+
+
+-- L4 — Read-only role for NL->SQL query execution.
+-- Used exclusively by retrieve/analytics.py — never the main app user,
+-- which retains full read/write for ingestion scripts (load_metadata.py,
+-- fetch_trials.py, etc.). Defense-in-depth: even if code-level SQL
+-- validation had a bug, the database itself refuses non-SELECT statements
+-- for this role.
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'immunorag_readonly') THEN
+        CREATE ROLE immunorag_readonly WITH LOGIN PASSWORD 'readonly_dev_pw';
+    END IF;
+END
+$$;
+
+GRANT CONNECT ON DATABASE immunorag TO immunorag_readonly;
+GRANT USAGE ON SCHEMA public TO immunorag_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO immunorag_readonly;
+
+-- Ensures any FUTURE tables created by the main user are also
+-- automatically readable by this role, without needing to re-grant
+-- manually every time the schema grows (L5+ will add more tables).
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO immunorag_readonly;
