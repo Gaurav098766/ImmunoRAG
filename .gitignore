@@ -17,3 +17,4 @@ data/processed/*
 qdrant_data/
 pg_data/
 redis_data/
+neo4j_data/
