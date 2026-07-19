@@ -19,6 +19,7 @@ Run:
 import json
 import time
 from pathlib import Path
+from groq import Groq, RateLimitError, APIError
 
 from groq import Groq
 from neo4j import GraphDatabase
@@ -97,6 +98,9 @@ def extract_entities_relationships(text: str) -> dict | None:
     """
     Send one chunk's text to Groq, parse the returned JSON.
     Returns None if extraction failed or produced invalid JSON.
+    Logs the actual failure reason instead of silently swallowing it.
+    Raises RateLimitError so the caller can stop the whole run rather
+    than silently failing every remaining chunk.
     """
     client = get_groq_client()
     try:
@@ -113,9 +117,18 @@ def extract_entities_relationships(text: str) -> dict | None:
         parsed = json.loads(raw)
 
         if "entities" not in parsed or "relationships" not in parsed:
+            print("    [skip] response missing expected keys")
             return None
         return parsed
-    except (json.JSONDecodeError, Exception):
+
+    except RateLimitError as e:
+        print(f"    [RATE LIMIT] {str(e)[:150]}")
+        raise
+    except json.JSONDecodeError as e:
+        print(f"    [JSON PARSE ERROR] {str(e)[:150]}")
+        return None
+    except APIError as e:
+        print(f"    [API ERROR] {str(e)[:150]}")
         return None
 
 
@@ -200,6 +213,8 @@ def main():
                 print(f"  Processed {i}/{len(chunks)} chunks...")
 
             time.sleep(DELAY_BETWEEN_CALLS)
+    except RateLimitError:
+        print(f"\nStopped early due to rate limit — processed {i}/{len(chunks)} chunks before hitting the daily cap.")
     finally:
         driver.close()
 
