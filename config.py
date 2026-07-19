@@ -41,3 +41,8 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 OPENFDA_BASE_URL = "https://api.fda.gov"
 CACHE_TTL_SECONDS = 3600  # 1 hour — openFDA data doesn't change minute-to-minute
+
+
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "immunorag_neo4j_pw")
