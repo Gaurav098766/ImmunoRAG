@@ -65,6 +65,22 @@ Rules:
 }
 """
 
+
+# Add near the top of build_graph.py, after imports
+PROGRESS_FILE = Path("data/processed/graph_progress.json")
+
+
+def load_progress() -> set:
+    """Track which pmcid+chunk_index combos have already been processed."""
+    if PROGRESS_FILE.exists():
+        return set(json.loads(PROGRESS_FILE.read_text()))
+    return set()
+
+
+def save_progress(done: set):
+    PROGRESS_FILE.write_text(json.dumps(list(done)))
+
+
 _groq_client = None
 
 
@@ -185,37 +201,51 @@ def main():
     chunks = load_target_chunks()
     print(f"Selected {len(chunks)} chunks for extraction (capped at {MAX_CHUNKS}).")
 
+
+    done = load_progress()
+    print(f"Already processed in a previous run: {len(done)} chunks.")
+
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
     total_entities = 0
     total_relationships = 0
     skipped = 0
+    i = 0
 
     try:
         for i, chunk in enumerate(chunks, 1):
+            chunk_key = f"{chunk['pmcid']}::{chunk['section']}::{chunk['chunk_index']}"
+            if chunk_key in done:
+                continue
+
             raw = extract_entities_relationships(chunk["text"])
             if raw is None:
                 skipped += 1
+                done.add(chunk_key)
                 time.sleep(DELAY_BETWEEN_CALLS)
                 continue
 
             validated = validate_extraction(raw)
             if not validated["entities"]:
                 skipped += 1
+                done.add(chunk_key)
                 time.sleep(DELAY_BETWEEN_CALLS)
                 continue
 
             write_to_neo4j(driver, validated, chunk["pmcid"])
             total_entities += len(validated["entities"])
             total_relationships += len(validated["relationships"])
+            done.add(chunk_key)
 
             if i % 50 == 0:
                 print(f"  Processed {i}/{len(chunks)} chunks...")
+                save_progress(done)  # periodic save, don't lose progress on crash
 
             time.sleep(DELAY_BETWEEN_CALLS)
     except RateLimitError:
         print(f"\nStopped early due to rate limit — processed {i}/{len(chunks)} chunks before hitting the daily cap.")
     finally:
+        save_progress(done)  # always save final state, even on early stop
         driver.close()
 
     print(f"\nDone. Processed {len(chunks)} chunks, skipped {skipped} (no valid extraction).")
