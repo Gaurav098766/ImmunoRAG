@@ -1,11 +1,11 @@
 # ImmunoRAG
 
 A progressive, 12-level Retrieval-Augmented Generation (RAG) system built over
-**cancer immunotherapy research literature** — engineered from the ground up to run
+**cancer immunotherapy research literature**, engineered from the ground up to run
 entirely on constrained hardware: **CPU-only, 8GB RAM, no GPU.**
 
-No self-hosted LLMs. No multi-GB models. Every design choice — from the embedding
-model to the vector database to the LLM API — was made to prove that a genuinely
+No self-hosted LLMs. No multi-GB models. Every design choice from the embedding
+model to the vector database to the LLM API was made to prove that a genuinely
 capable, multi-modal RAG system doesn't require expensive infrastructure.
 
 ---
@@ -24,7 +24,7 @@ question actually needs:
 - **Pull live drug safety data** from the FDA's public adverse-event database,
   cached for speed
 - **Traverse a knowledge graph** connecting drugs to the biological targets they
-  act on, the cell types involved, and the conditions they treat/cause — built by
+  act on, the cell types involved, and the conditions they treat/cause built by
   having an LLM read the literature and extract these relationships
 - **Route each question automatically** to whichever of the above tools actually
   fits, via an AI agent, and expose the whole thing through a web API
@@ -33,13 +33,13 @@ question actually needs:
 
 ## Why build it this way
 
-Cancer immunotherapy is a genuinely complex, fast-moving field — spanning
+Cancer immunotherapy is a genuinely complex, fast-moving field spanning
 published research, actively-running clinical trials, and real-world drug safety
 data that all update independently of each other. A system that only searches
 papers would miss ongoing trials; a system that only has trial data would miss
 mechanistic detail from the literature. ImmunoRAG combines these deliberately,
 and treats "can this run on modest, affordable hardware" as a first-class design
-constraint, not an afterthought — every model and tool choice was picked for a
+constraint, not an afterthought every model and tool choice was picked for a
 strong balance of quality and efficiency, not by defaulting to the biggest/most
 expensive option.
 
@@ -127,10 +127,10 @@ each stage.
 ## Project structure
 
 immunorag/
-├── ingest/ # data fetching, parsing, chunking, embedding, graph-building
-├── retrieve/ # search, filtering, analytics, live-API, graph-query modules
-├── agent/ # agentic routing (LangGraph)
-├── app/ # FastAPI web API
-├── db/ # PostgreSQL schema
-├── scripts/ # verification / smoke-test scripts
-└── data/ # raw and processed corpus data (not committed — regenerable)
+├── ingest/    # data fetching, parsing, chunking, embedding, graph-building
+├── retrieve/  # search, filtering, analytics, live-API, graph-query modules
+├── agent/     # agentic routing (LangGraph)
+├── app/       # FastAPI web API
+├── db/        # PostgreSQL schema
+├── scripts/   # verification / smoke-test scripts
+└── data/      # raw and processed corpus data (not committed — regenerable)
