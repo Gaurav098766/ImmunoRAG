@@ -126,6 +126,7 @@ each stage.
 
 ## Project structure
 
+```
 immunorag/
 ├── ingest/    # data fetching, parsing, chunking, embedding, graph-building
 ├── retrieve/  # search, filtering, analytics, live-API, graph-query modules
@@ -134,3 +135,4 @@ immunorag/
 ├── db/        # PostgreSQL schema
 ├── scripts/   # verification / smoke-test scripts
 └── data/      # raw and processed corpus data (not committed — regenerable)
+```
