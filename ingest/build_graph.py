@@ -1,6 +1,6 @@
 # ingest/build_graph.py
 """
-L6 — Extract entities and relationships from chunk text using Groq,
+L6 — Extract entities and relationships from chunk text using OpenAI,
 build a knowledge graph in Neo4j.
 
 Processes a capped subset of chunks (Abstract/Introduction sections only,
@@ -19,19 +19,17 @@ Run:
 import json
 import time
 from pathlib import Path
-from groq import Groq, RateLimitError, APIError
-
-from groq import Groq
+from openai import OpenAI, RateLimitError, APIError
 from neo4j import GraphDatabase
 
 from config import (
-    PROCESSED_DATA_DIR, GROQ_API_KEY, GROQ_MODEL,
+    PROCESSED_DATA_DIR, OPENAI_API_KEY, OPENAI_MODEL,
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD,
 )
 
 TARGET_SECTIONS = {"Abstract", "Introduction"}
 MAX_CHUNKS = 500
-DELAY_BETWEEN_CALLS = 0.3  # seconds, be polite to Groq's free tier
+DELAY_BETWEEN_CALLS = 0.3  # seconds, be polite to rate limits
 
 VALID_ENTITY_TYPES = {"Drug", "Target", "CellType", "Condition"}
 VALID_RELATIONSHIPS = {"TARGETS", "TREATS", "CAUSES", "EXPRESSED_BY", "ASSOCIATED_WITH"}
@@ -66,7 +64,6 @@ Rules:
 """
 
 
-# Add near the top of build_graph.py, after imports
 PROGRESS_FILE = Path("data/processed/graph_progress.json")
 
 
@@ -81,14 +78,14 @@ def save_progress(done: set):
     PROGRESS_FILE.write_text(json.dumps(list(done)))
 
 
-_groq_client = None
+_openai_client = None
 
 
-def get_groq_client() -> Groq:
-    global _groq_client
-    if _groq_client is None:
-        _groq_client = Groq(api_key=GROQ_API_KEY)
-    return _groq_client
+def get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    return _openai_client
 
 
 def load_target_chunks() -> list[dict]:
@@ -112,16 +109,16 @@ def load_target_chunks() -> list[dict]:
 
 def extract_entities_relationships(text: str) -> dict | None:
     """
-    Send one chunk's text to Groq, parse the returned JSON.
+    Send one chunk's text to OpenAI, parse the returned JSON.
     Returns None if extraction failed or produced invalid JSON.
     Logs the actual failure reason instead of silently swallowing it.
     Raises RateLimitError so the caller can stop the whole run rather
     than silently failing every remaining chunk.
     """
-    client = get_groq_client()
+    client = get_openai_client()
     try:
         response = client.chat.completions.create(
-            model=GROQ_MODEL,
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
                 {"role": "user", "content": text},
@@ -243,7 +240,7 @@ def main():
 
             time.sleep(DELAY_BETWEEN_CALLS)
     except RateLimitError:
-        print(f"\nStopped early due to rate limit — processed {i}/{len(chunks)} chunks before hitting the daily cap.")
+        print(f"\nStopped early due to rate limit — processed {i}/{len(chunks)} chunks before hitting the cap.")
     finally:
         save_progress(done)  # always save final state, even on early stop
         driver.close()
