@@ -2,7 +2,7 @@
 """
 L4 — Natural language to SQL analytics over papers + trials tables.
 
-Translates a natural-language question into a SQL SELECT query using Groq,
+Translates a natural-language question into a SQL SELECT query using OpenAI,
 validates it's read-only and safe, executes it against a restricted
 read-only Postgres role, and returns results.
 
@@ -15,9 +15,9 @@ Run interactively:
 import re
 
 import psycopg
-from groq import Groq
+from openai import OpenAI
 
-from config import GROQ_API_KEY, GROQ_MODEL, POSTGRES_READONLY_DSN
+from config import OPENAI_API_KEY, OPENAI_MODEL, POSTGRES_READONLY_DSN
 
 QUERY_TIMEOUT_MS = 5000  # 5 seconds — generous for this corpus size, prevents runaway queries
 
@@ -69,24 +69,24 @@ FORBIDDEN_KEYWORDS = {
     "truncate", "grant", "create", "revoke",
 }
 
-_groq_client = None
+_openai_client = None
 
 
-def get_groq_client() -> Groq:
-    global _groq_client
-    if _groq_client is None:
-        _groq_client = Groq(api_key=GROQ_API_KEY)
-    return _groq_client
+def get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    return _openai_client
 
 
 def generate_sql(question: str) -> str | None:
     """
-    Ask Groq to translate a natural-language question into SQL.
-    Returns None if Groq indicates the question isn't answerable via SQL.
+    Ask OpenAI to translate a natural-language question into SQL.
+    Returns None if the model indicates the question isn't answerable via SQL.
     """
-    client = get_groq_client()
+    client = get_openai_client()
     response = client.chat.completions.create(
-        model=GROQ_MODEL,
+        model=OPENAI_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": question},
